@@ -12,6 +12,7 @@ import {
   ElProgress,
   ElRow,
   ElStatistic,
+  ElText,
 } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
 
@@ -24,6 +25,7 @@ import { useLog } from '@/stores/log'
 import { delay, notification } from '@/utils'
 import { logger } from '@/utils/logger'
 
+import { useCrawler } from '../hooks/useCrawler'
 import { useDeliver } from '../hooks/useDeliver'
 import { usePager } from '../hooks/usePager'
 
@@ -31,6 +33,7 @@ const log = useLog()
 const statistics = useStatistics()
 const common = useCommon()
 const deliver = useDeliver()
+const crawler = useCrawler()
 const { next, page } = usePager()
 const conf = useConf()
 const statisticCycle = ref(1)
@@ -78,6 +81,10 @@ function stopDeliver() {
   common.deliverStop = true
 }
 async function startBatch() {
+  if (crawler.crawling) {
+    ElMessage.warning('采集进行中，无法投递')
+    return
+  }
   common.deliverLock = true
   common.deliverStop = false
   let stepMsg = '投递结束'
@@ -122,6 +129,14 @@ async function startBatch() {
     ElMessage.info(stepMsg)
     common.deliverLock = false
   }
+}
+
+async function startCrawler() {
+  await crawler.startExport()
+}
+
+function stopCrawler() {
+  crawler.stop()
 }
 
 function resetFilter() {
@@ -237,6 +252,7 @@ onMounted(() => {
         type="primary"
         data-help="点击开始就会开始投递"
         :loading="common.deliverLock"
+        :disabled="crawler.crawling"
         @click="startBatch"
       >
         开始
@@ -245,6 +261,7 @@ onMounted(() => {
         v-if="!common.deliverLock && common.deliverStop"
         type="warning"
         data-help="重置已被筛选的岗位，开始将重新处理"
+        :disabled="crawler.crawling"
         @click="resetFilter"
       >
         重置筛选
@@ -257,6 +274,23 @@ onMounted(() => {
       >
         暂停
       </ElButton>
+      <ElButton
+        type="success"
+        data-help="只采集当前搜索条件下的岗位并导出CSV，不会自动打招呼或投递"
+        :loading="crawler.crawling"
+        :disabled="common.deliverLock"
+        @click="startCrawler"
+      >
+        采集导出
+      </ElButton>
+      <ElButton
+        v-if="crawler.crawling"
+        type="warning"
+        data-help="停止采集并导出已采集到的岗位"
+        @click="stopCrawler"
+      >
+        停止采集
+      </ElButton>
     </ElButtonGroup>
     <ElProgress
       data-help="我会统计当天脚本投递的数量,该记录并不准确"
@@ -264,6 +298,15 @@ onMounted(() => {
       :percentage="Number(((statistics.todayData.success / deliveryLimit) * 100).toFixed(1))"
     />
   </div>
+  <ElText
+    v-if="crawler.crawling || crawler.collectedCount > 0 || crawler.statusText !== '未开始'"
+    data-help="采集导出只读取当前搜索条件下的职位，不会自动投递"
+    size="small"
+    type="info"
+  >
+    采集：{{ crawler.statusText }}；第 {{ crawler.currentPage }} 页；已采集
+    {{ crawler.collectedCount }} 个；失败 {{ crawler.failedCount }} 个
+  </ElText>
 </template>
 
 <style lang="scss"></style>

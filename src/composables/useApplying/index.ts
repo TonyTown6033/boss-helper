@@ -66,7 +66,61 @@ export async function createHandle(): Promise<{
   after: Handler[]
 }> {
   const h = handles()
-  const pipeline: Pipeline = [
+  const pipeline = createPipeline(h, true)
+  return compilePipeline(pipeline)
+}
+
+export async function createReadonlyFilterHandle(): Promise<{
+  before: Handler[]
+}> {
+  const h = handles()
+  const pipeline = createPipeline(h, false)
+  return {
+    before: compilePipeline(pipeline).before,
+  }
+}
+
+function createPipeline(h: ReturnType<typeof handles>, includeGreeting: boolean): Pipeline {
+  const cardPipeline: Pipeline = [
+    // Card卡片信息获取
+    async (args) => {
+      if (args.data.card == null) {
+        if ((await args.data.getCard()) == null) {
+          throw new UnknownError('Card 信息获取失败')
+        }
+      }
+    },
+    h.activityFilter(), // 活跃度过滤
+    h.hrPosition(), // Hr职位筛选
+    h.jobAddress(), // 工作地址筛选
+    h.jobFriendStatus(), // 好友状态过滤
+    h.jobContent(), // 工作内容筛选
+    [
+      // 高德地图
+      async (args, ctx) => {
+        ctx.amap ??= {}
+        try {
+          ctx.amap.geocode = await amapGeocode(
+            args.data.card?.address ?? args.data.card?.jobInfo.address ?? '',
+          ) // TODO: 直接使用经纬度
+          if (!ctx.amap.geocode?.location) {
+            throw new JobAddressError('未获取到地址经纬度')
+          }
+          ctx.amap.distance = await amapDistance(ctx.amap.geocode.location)
+        } catch (e) {
+          logger.error('高德地图错误', e)
+          throw new JobAddressError(`错误: ${e instanceof Error ? e.message : '未知'}`)
+        }
+      },
+      h.amap(),
+    ],
+    h.aiFiltering(), // AI过滤
+  ]
+  if (includeGreeting) {
+    cardPipeline.push(h.greeting()) // 招呼语
+  }
+
+  return [
     h.communicated(), // 已沟通过滤
     h.SameCompanyFilter(), // 相同公司过滤
     h.SameHrFilter(), // 相同hr过滤
@@ -75,44 +129,8 @@ export async function createHandle(): Promise<{
     h.salaryRange(), // 薪资筛选
     h.companySizeRange(), // 公司规模筛选
     h.goldHunterFilter(), // 猎头过滤
-    [
-      // Card卡片信息获取
-      async (args) => {
-        if (args.data.card == null) {
-          if ((await args.data.getCard()) == null) {
-            throw new UnknownError('Card 信息获取失败')
-          }
-        }
-      },
-      h.activityFilter(), // 活跃度过滤
-      h.hrPosition(), // Hr职位筛选
-      h.jobAddress(), // 工作地址筛选
-      h.jobFriendStatus(), // 好友状态过滤
-      h.jobContent(), // 工作内容筛选
-      [
-        // 高德地图
-        async (args, ctx) => {
-          ctx.amap ??= {}
-          try {
-            ctx.amap.geocode = await amapGeocode(
-              args.data.card?.address ?? args.data.card?.jobInfo.address ?? '',
-            ) // TODO: 直接使用经纬度
-            if (!ctx.amap.geocode?.location) {
-              throw new JobAddressError('未获取到地址经纬度')
-            }
-            ctx.amap.distance = await amapDistance(ctx.amap.geocode.location)
-          } catch (e) {
-            logger.error('高德地图错误', e)
-            throw new JobAddressError(`错误: ${e instanceof Error ? e.message : '未知'}`)
-          }
-        },
-        h.amap(),
-      ],
-      h.aiFiltering(), // AI过滤
-      h.greeting(), // 招呼语
-    ],
+    cardPipeline,
   ]
-  return compilePipeline(pipeline)
 }
 
 /**
