@@ -471,7 +471,7 @@ export function handles() {
             content: msg,
           })
 
-          buf.send()
+          await buf.send()
         } catch (e) {
           throw new GreetError(errorHandle(e))
         }
@@ -545,7 +545,7 @@ export function handles() {
             to_name: ctx.bossData.data.encryptBossId, // encryptUserId
             content,
           })
-          buf.send()
+          await buf.send()
         } catch (e) {
           // chatInput.end('Err~')
           throw new GreetError(errorHandle(e))
