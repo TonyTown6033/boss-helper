@@ -2,7 +2,7 @@ import { ElMessage } from 'element-plus'
 import type { Ref } from 'vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
 
-import { useModel } from '@/composables/useModel'
+import { useModel, type modelData } from '@/composables/useModel'
 import { SignedKeyLLM } from '@/composables/useModel/signedKey'
 import type { prompt } from '@/composables/useModel/type'
 import { useConf } from '@/stores/conf'
@@ -112,7 +112,9 @@ function safeJsonParse(value: string | null): string[] {
   }
   try {
     const data = JSON.parse(value)
-    return Array.isArray(data) ? data.filter((item): item is string => typeof item === 'string') : []
+    return Array.isArray(data)
+      ? data.filter((item): item is string => typeof item === 'string')
+      : []
   } catch {
     return []
   }
@@ -175,7 +177,10 @@ function formatFilteringCriteria(
   enabled: boolean,
 ): string {
   const promptText = formatPromptTemplate(promptTemplate)
-  const criteria = limitContextText(promptText || '未配置 AI筛选标准。', MAX_FILTERING_CONTEXT_CHARS)
+  const criteria = limitContextText(
+    promptText || '未配置 AI筛选标准。',
+    MAX_FILTERING_CONTEXT_CHARS,
+  )
   return [
     `AI筛选状态: ${enabled ? '已启用' : '未启用'}`,
     `过滤分数阈值: ${score ?? 10}`,
@@ -315,7 +320,11 @@ function scoreJobElement(element: HTMLElement, text: string): number {
   return score - Math.min(text.length / 30, 10)
 }
 
-function expandJobElement(element: HTMLElement): { element: HTMLElement; text: string; source: string } {
+function expandJobElement(element: HTMLElement): {
+  element: HTMLElement
+  text: string
+  source: string
+} {
   let current: HTMLElement | null = element
   let best = {
     element,
@@ -325,7 +334,11 @@ function expandJobElement(element: HTMLElement): { element: HTMLElement; text: s
 
   for (let depth = 0; current && current !== document.body && depth < 5; depth++) {
     const text = visibleElementInnerText(current)
-    if (isLikelyJobText(text) && text.length >= best.text.length && text.length <= MAX_JOB_CONTEXT_CHARS) {
+    if (
+      isLikelyJobText(text) &&
+      text.length >= best.text.length &&
+      text.length <= MAX_JOB_CONTEXT_CHARS
+    ) {
       best = {
         element: current,
         text,
@@ -338,7 +351,9 @@ function expandJobElement(element: HTMLElement): { element: HTMLElement; text: s
   return best
 }
 
-function pickCurrentJobElementByScan(): { element: HTMLElement; text: string; source: string } | undefined {
+function pickCurrentJobElementByScan():
+  | { element: HTMLElement; text: string; source: string }
+  | undefined {
   const elements = Array.from(
     document.body.querySelectorAll<HTMLElement>('div, section, header, main, article, a, span, p'),
   )
@@ -380,7 +395,9 @@ function pickCurrentJobElement(): HTMLElement | undefined {
 function extractCurrentJobContext(title: string): ChatJobContext {
   const scanned = pickCurrentJobElementByScan()
   const element = pickCurrentJobElement()
-  const rawText = scanned?.text ?? limitContextText(element ? visibleElementInnerText(element) : '', MAX_JOB_CONTEXT_CHARS)
+  const rawText =
+    scanned?.text ??
+    limitContextText(element ? visibleElementInnerText(element) : '', MAX_JOB_CONTEXT_CHARS)
   const detailUrl = findJobDetailUrl(scanned?.element ?? element)
   if (!rawText) {
     return {
@@ -399,10 +416,11 @@ function extractCurrentJobContext(title: string): ChatJobContext {
   const beforeSalary = salary ? rawText.slice(0, rawText.indexOf(salary)).trim() : rawText
   const titleText = beforeSalary.split(/\s+/).filter(Boolean).at(-1) ?? beforeSalary
   const restText = salary ? rawText.slice(rawText.indexOf(salary) + salary.length).trim() : rawText
-  const location = restText
-    .replace('查看职位', '')
-    .split(/\s+/)
-    .find((item) => item.length >= 2 && item.length <= 8 && !item.includes('在线')) ?? ''
+  const location =
+    restText
+      .replace('查看职位', '')
+      .split(/\s+/)
+      .find((item) => item.length >= 2 && item.length <= 8 && !item.includes('在线')) ?? ''
   return {
     title: titleText,
     salary,
@@ -446,7 +464,9 @@ function findJobDetailUrl(element?: HTMLElement): string {
 
 function pickJobDetailTextFromHtml(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html')
-  doc.querySelectorAll('script, style, noscript, svg, img, header, nav, footer').forEach((item) => item.remove())
+  doc
+    .querySelectorAll('script, style, noscript, svg, img, header, nav, footer')
+    .forEach((item) => item.remove())
 
   const selectors = [
     '.job-detail',
@@ -475,8 +495,14 @@ function pickJobDetailTextFromHtml(html: string): string {
       )
     })
     .sort((a, b) => {
-      const aScore = Number(a.includes('职位描述')) + Number(a.includes('岗位职责')) + Number(a.includes('任职要求'))
-      const bScore = Number(b.includes('职位描述')) + Number(b.includes('岗位职责')) + Number(b.includes('任职要求'))
+      const aScore =
+        Number(a.includes('职位描述')) +
+        Number(a.includes('岗位职责')) +
+        Number(a.includes('任职要求'))
+      const bScore =
+        Number(b.includes('职位描述')) +
+        Number(b.includes('岗位职责')) +
+        Number(b.includes('任职要求'))
       return bScore - aScore || b.length - a.length
     })
 
@@ -567,7 +593,9 @@ async function loadProfileContext(): Promise<ProfileContext> {
   }
 }
 
-function isEditableElement(element: HTMLElement): element is HTMLInputElement | HTMLTextAreaElement {
+function isEditableElement(
+  element: HTMLElement,
+): element is HTMLInputElement | HTMLTextAreaElement {
   return element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
 }
 
@@ -634,7 +662,9 @@ function fillComposer(element: HTMLElement, content: string) {
   if (!normalizeText(element.textContent ?? '').includes(normalizeText(content))) {
     element.textContent = content
   }
-  element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: content }))
+  element.dispatchEvent(
+    new InputEvent('input', { bubbles: true, inputType: 'insertText', data: content }),
+  )
 }
 
 function getComposerText(element: HTMLElement): string {
@@ -786,6 +816,55 @@ export function useAutoChat(args: { title: Ref<string>; messages: Ref<CapturedMe
     args.messages.value.forEach((message) => seenKeys.add(getMessageKey(args.title.value, message)))
   }
 
+  async function ensureAiReplyStoresReady() {
+    if (!conf.isLoaded) {
+      addLog('info', 'AI回复配置加载中')
+      await conf.confInit()
+    }
+    await model.initModel()
+  }
+
+  function getModelData(): modelData[] {
+    return model.modelData as unknown as modelData[]
+  }
+
+  function formatModelNames(models: modelData[]): string {
+    return models.map((item) => `${item.name}(${item.key})`).join('、') || '无'
+  }
+
+  function resolveAiReplyModel(): modelData {
+    const configuredModelKey = conf.formData.aiReply.model
+    const models = getModelData()
+    const customModels = models.filter((item) => item.data && !item.vip)
+    if (configuredModelKey) {
+      const selectedModel = models.find((item) => configuredModelKey === item.key)
+      if (!selectedModel) {
+        if (customModels.length === 1) {
+          addLog(
+            'warn',
+            'AI回复配置的模型已失效，已临时使用唯一自定义模型',
+            `失效模型=${configuredModelKey}, 使用=${customModels[0].name}(${customModels[0].key})`,
+          )
+          return customModels[0]
+        }
+        throw new Error(
+          `没有找到AI回复配置的模型(${configuredModelKey})，当前可用模型: ${formatModelNames(customModels)}，请重新选择模型并保存`,
+        )
+      }
+      addLog('info', 'AI回复使用模型', `${selectedModel.name}(${selectedModel.key})`)
+      return selectedModel
+    }
+
+    if (customModels.length === 1) {
+      addLog('warn', 'AI回复未选择模型，已临时使用唯一自定义模型', customModels[0].name)
+      return customModels[0]
+    }
+    if (customModels.length === 0) {
+      throw new Error('还没有配置可用于AI回复的自定义模型，请先在模型配置里添加模型')
+    }
+    throw new Error('AI回复还没有选择模型，请在AI回复设置里选择模型并保存')
+  }
+
   function syncConversationBaseline(): boolean {
     const stableKey = getConversationStableKey()
     const key = getConversationKey(args.title.value)
@@ -820,14 +899,19 @@ export function useAutoChat(args: { title: Ref<string>; messages: Ref<CapturedMe
 
   async function createReply(message: CapturedMessage): Promise<string> {
     addLog('info', '开始生成AI回复', clipText(message.content))
+    await ensureAiReplyStoresReady()
     if (conf.formData.aiReply.vip) {
       throw new Error('AI回复暂不支持会员模式，请选择自定义模型')
     }
-    const curModel = model.modelData.find((item) => conf.formData.aiReply.model === item.key)
-    if (!curModel) {
-      throw new Error('没有找到AI回复的模型')
+    const curModel = resolveAiReplyModel()
+    if (!curModel.data || curModel.vip) {
+      throw new Error('AI回复暂不支持会员模型，请选择自定义模型')
     }
-    const gpt = model.getModel(curModel, buildRuntimeAiReplyPrompt(conf.formData.aiReply.prompt), false)
+    const gpt = model.getModel(
+      curModel,
+      buildRuntimeAiReplyPrompt(conf.formData.aiReply.prompt),
+      false,
+    )
     if (gpt instanceof SignedKeyLLM) {
       throw new Error('AI回复暂不支持会员模式，请选择自定义模型')
     }
@@ -906,7 +990,11 @@ export function useAutoChat(args: { title: Ref<string>; messages: Ref<CapturedMe
     seenKeys.add(key)
     processing.value = true
     statusText.value = '正在生成回复草稿...'
-    addLog('info', mode === 'auto' ? '自动触发回复草稿' : '手动触发回复草稿', clipText(message.content))
+    addLog(
+      'info',
+      mode === 'auto' ? '自动触发回复草稿' : '手动触发回复草稿',
+      clipText(message.content),
+    )
     try {
       const reply = await createReply(message)
       if (!reply) {

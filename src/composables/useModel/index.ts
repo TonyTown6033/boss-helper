@@ -39,6 +39,8 @@ export interface modelData {
 
 export const useModel = defineStore('model', () => {
   const _modelData = ref<modelData[]>([])
+  let initPromise: Promise<void> | undefined
+  let initialized = false
 
   const modelData = computed({
     get() {
@@ -50,9 +52,28 @@ export const useModel = defineStore('model', () => {
   })
 
   async function init() {
-    const data = await counter.storageGet<modelData[]>(confModelKey, [])
-    logger.debug('ai模型数据', data)
-    modelData.value.push(...data)
+    if (initialized) {
+      return
+    }
+    if (initPromise) {
+      return initPromise
+    }
+    initPromise = (async () => {
+      const data = await counter.storageGet<modelData[]>(confModelKey, [])
+      logger.debug('ai模型数据', data)
+      data.forEach((item) => {
+        const existing = _modelData.value.findIndex((model) => model.key === item.key)
+        if (existing >= 0) {
+          _modelData.value[existing] = item
+        } else {
+          _modelData.value.push(item)
+        }
+      })
+      initialized = true
+    })().finally(() => {
+      initPromise = undefined
+    })
+    return initPromise
   }
 
   function getModel(
