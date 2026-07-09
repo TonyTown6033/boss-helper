@@ -12,6 +12,15 @@
 - [ ] 采集导出岗位级节流 - [设计说明](docs/crawler/boss-job-export-design.md)
 - [ ] 采集导出最大覆盖策略 - [设计说明](docs/crawler/boss-job-export-design.md)
 
+## 聊天采集
+
+- [ ] Boss 聊天会话本地记录 - [设计说明](docs/chat/boss-chat-session-capture-design.md)
+- [ ] Boss 聊天自动回复 - [设计说明](docs/chat/boss-auto-chat-design.md)
+
+## AI 配置
+
+- [ ] AI 默认提示词优化 - [设计说明](docs/ai/default-prompts-design.md)
+
 ## 使用约定
 
 - 新功能、功能扩展或较大的行为变更，先在本文件登记任务，并链接到 `docs/` 下的设计文档。

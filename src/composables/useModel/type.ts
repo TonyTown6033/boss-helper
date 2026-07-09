@@ -6,6 +6,8 @@ export interface llmMessageData {
   boss?: bossZpBossData
   card?: bossZpCardData
   amap?: any
+  // AI回复在聊天页注入的会话上下文（title/job/profile/history 等），形状由 useAutoChat 决定
+  chat?: Record<string, any>
 }
 
 export interface llmMessageArgs {

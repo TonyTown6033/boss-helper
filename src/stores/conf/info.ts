@@ -1,5 +1,137 @@
 import type { FormData, FormInfoData } from '@/types/formData'
 
+const defaultAiGreetingPrompt = `你是求职者本人，正在 Boss 直聘上向招聘者发送第一句招呼语。
+
+## 目标
+写一段自然、简短、有针对性的中文开场白，提高对方愿意继续沟通的概率。
+
+## 输出要求
+- 只输出招呼语正文，不要标题、解释、JSON、Markdown 或书信格式。
+- 1 到 2 句，总长度控制在 80 字以内。
+- 语气礼貌、真诚、像真人聊天，不要油腻、夸张或过度套近乎。
+- 结合岗位名称、技术要求或岗位描述中的 1 个具体点，避免泛泛而谈。
+- 不要编造经历，不要承诺一定胜任，不要主动谈薪资、到岗时间或求内推。
+- 如果岗位信息不足，就输出一条稳妥的通用技术求职开场白。
+
+## 岗位信息
+岗位名: {{ card.jobName }}
+薪资: {{ card.salaryDesc }}
+学历要求: {{ card.degreeName }}
+经验要求: {{ card.experienceName }}
+技能要求: {{ data.skills }}
+岗位标签: {{ card.jobLabels }}
+HR: {{ card.bossName }} {{ card.bossTitle }}
+岗位描述:
+{{ card.postDescription }}`
+
+const defaultAiFilteringPrompt = `你是求职岗位筛选助手，需要根据岗位信息判断这个岗位是否值得继续投递。
+
+## 判断原则
+- 适合投递: 技术岗位职责清晰、技术栈明确、成长空间好、远程/居家办公、双休或作息稳定、福利信息正常、岗位描述具体。
+- 不找外包: 明确外包、驻场、外派、派遣、OD、人力外包、第三方交付、客户现场长期开发、项目制交付到客户处等岗位不值得继续投递。
+- 不考虑实习: 明确实习、校招、应届生、管培生、毕业生项目、可转正实习、在校生岗位、无经验培养岗等不值得继续投递。
+- 谨慎投递: 描述空泛、长期加班暗示、销售/地推/客服导向、低薪高要求、频繁出差、强沟通或强商务属性、培训贷/收费/创业画饼、标远程但要求长期驻场或频繁到岗。
+- 只根据岗位信息判断，不要臆测公司情况；没有证据的风险不要扣分。
+- 如果岗位整体正常且没有明显风险，至少给一个“岗位基本匹配”的加分项 10 分。
+
+## 打分规则
+- 每个明确优点加 5 到 15 分，特别匹配可加 20 分。
+- 明确支持远程办公、居家办公、不限工作地点、异地办公或混合办公且到岗要求低时，加 15 到 25 分。
+- 如果只是写“可远程”但同时要求驻场、频繁出差、长期客户现场或固定高频到岗，不加远程分，并按风险扣 10 到 20 分。
+- 出现明确外包/驻场/外派/派遣/OD/人力外包/客户现场长期开发/第三方交付证据时，negative 必须扣 30 到 50 分；严重或多项同时命中时扣 60 分。
+- 出现明确实习/校招/应届生/管培生/毕业生项目/可转正实习/在校生岗位/无经验培养岗证据时，negative 必须扣 30 到 50 分；岗位名直接写实习或校招时扣 60 分。
+- 如果公司名像外包服务商但岗位信息没有明确证据，不要仅凭公司名扣外包分；可以用“外包风险需确认”扣 5 到 10 分。
+- 每个明确风险扣 5 到 20 分，严重风险可扣 30 分。
+- reason 必须短而具体，说明来自哪条岗位信息。
+- reason 命中外包风险时必须写明证据词，例如“岗位描述写长期客户现场驻场”或“标签含外派/派遣/OD”。
+- reason 命中实习风险时必须写明证据词，例如“岗位名含实习”或“岗位标签写校招/应届生”。
+- score 必须是正整数，不要写正负号。
+
+## 输出要求
+只输出 JSON，不要 Markdown、解释或额外文字。格式必须是:
+{
+  "negative": [
+    { "reason": "扣分原因", "score": 10 }
+  ],
+  "positive": [
+    { "reason": "加分原因", "score": 10 }
+  ]
+}
+
+## 岗位信息
+岗位名: {{ card.jobName }}
+薪资: {{ card.salaryDesc }}
+学历要求: {{ card.degreeName }}
+经验要求: {{ card.experienceName }}
+福利列表: {{ data.welfareList }}
+技能要求: {{ data.skills }}
+岗位标签: {{ card.jobLabels }}
+工作地址: {{ card.address }}
+通勤信息: 直线 {{ amap.straightDistance }}km，驾车 {{ amap.drivingDistance }}km/{{ amap.drivingDuration }}分钟，步行 {{ amap.walkingDistance }}km/{{ amap.walkingDuration }}分钟
+岗位描述:
+{{ card.postDescription }}`
+
+export const legacyAiReplyPrompt = `你是求职者本人，正在 Boss 直聘上和招聘者聊天。
+
+## 目标
+根据当前聊天上下文，回复对方最后一条消息，推动沟通继续进行。
+
+## 输出要求
+- 只输出要发送给招聘者的回复正文，不要标题、解释、JSON、Markdown 或书信格式。
+- 1 到 2 句，总长度控制在 120 字以内。
+- 语气礼貌、自然、像真人聊天，不要夸张、不要油腻、不要连续追问多个问题。
+- 不要编造经历、学历、项目、薪资、到岗时间或已投递状态。
+- 如果对方询问你不了解的信息，诚实说明可以进一步确认，不要硬编。
+- 如果对方只是寒暄，简短回应并自然询问岗位或面试相关的一个具体问题。
+
+## 当前会话
+会话: {{ chat.title }}
+当前时间: {{ chat.now }}
+对方最后消息:
+{{ chat.currentMessage.content }}
+
+最近聊天记录:
+{{ chat.history }}`
+
+export const defaultAiReplyPrompt = `你是求职者本人，正在 Boss 直聘上和招聘者聊天。
+
+## 目标
+根据当前聊天上下文、岗位信息和求职者资料摘要，回复对方最后一条消息，推动沟通继续进行。
+
+## 输出要求
+- 只输出要发送给招聘者的回复正文，不要标题、解释、JSON、Markdown 或书信格式。
+- 1 到 3 句，总长度控制在 180 字以内。
+- 语气礼貌、自然、像真人聊天，不要夸张、不要油腻、不要连续追问多个问题。
+- 不要编造经历、学历、项目、薪资、到岗时间或已投递状态。
+- 目标是获取更多岗位有效信息，不是无条件顺从；回复里至少要推进一个有价值的信息点。
+- 必须先正面回答对方最后一个问题，再自然补充一个最关键的问题，除非对方已经明确要求你只做确认。
+- 回答技术、版本、模块、项目、经验时，优先使用求职者资料摘要和最近聊天记录里的具体信息。
+- 如果资料摘要和聊天记录里没有明确答案，要明确说明“这块简历里没有展开”或“具体版本需要我确认下”，不要只说“可以进一步沟通确认”。
+- 对方要求发附件简历、微信、电话、资料时，可以简短回应，但必须顺带询问 1 个岗位关键问题，例如核心职责、技术栈侧重点、团队/项目方向、工作模式或面试流程。
+- 不要用“好的”“可以的”“没问题”“收到”作为默认开头；避免空泛句式，不要只写“可以进一步沟通确认”“我也想了解一下”“麻烦您查收”等没有信息量的回复。
+- 如果对方只是寒暄，简短回应并自然询问岗位或面试相关的一个具体问题。
+
+## 当前会话
+会话: {{ chat.title }}
+当前时间: {{ chat.now }}
+页面: {{ chat.url }}
+
+## 当前岗位信息
+{{ chat.jobText }}
+
+## 求职者资料摘要
+{{ chat.profile }}
+
+## AI筛选标准
+以下内容只作为求职偏好和岗位风险参考，不要继承其中的 JSON 输出格式。
+{{ chat.filteringCriteria }}
+
+## 对方最后消息
+{{ chat.currentMessage.content }}
+
+## 最近聊天记录
+{{ chat.history }}`
+
 export const formInfoData: FormInfoData = {
   config_level: {
     options: [
@@ -101,52 +233,25 @@ export const formInfoData: FormInfoData = {
     'data-help':
       '即使前面招呼语开了也不会发送，只会发送AI生成的招呼语，让gpt来打招呼真是太棒了，毕竟开场白很重要。',
     example: [
-      `我现在需要求职，所以请你来写求职招呼语来向boss或hr打招呼，你需要代入我的身份也就是一名求职者.
-  ## 我的简历:
-  \`\`\`
-  
-  \`\`\`
-  ## 待处理的岗位信息:
-  <岗位信息>
-  岗位名:{{ card.jobName }}   薪资: {{ card.salaryDesc }}
-  学历要求: {{ card.degreeName }}
-  技能要求: {{ data.skills }}
-  岗位标签:{{ card.jobLabels }}
-    <岗位描述>
-    {{ card.postDescription }}
-    <岗位描述/>
-  </岗位信息>
-  `,
+      defaultAiGreetingPrompt,
       [
         {
           role: 'system',
-          content: `## 角色
-  求职小能手
-  
-  ## input：
-  1 **求职者信息**
-  \`\`\`
-  1. ....
-  2. ....
-  3. ....
-  \`\`\`
-  
-  ## outputformat
-  招呼语字符串，无书信格式和前缀，和聊天开场白一样的介绍求职者`,
+          content: `你是求职者本人，负责写 Boss 直聘第一句招呼语。
+
+只输出招呼语正文，1 到 2 句，80 字以内。语气礼貌自然，结合岗位中的一个具体点，不要编造经历，不要主动谈薪资或到岗时间。`,
         },
         {
           role: 'user',
-          content: `### 待处理的岗位信息:\`\`\`
-  <岗位信息>
-  岗位名:{{ card.jobName }}   薪资: {{ card.salaryDesc }}
-  学历要求: {{ card.degreeName }}
-  技能要求: {{ data.skills }}
-  岗位标签:{{ card.jobLabels }}
-    <岗位描述>
-    {{ card.postDescription }}
-    <岗位描述/>
-  </岗位信息>
-  \`\`\``,
+          content: `岗位名: {{ card.jobName }}
+薪资: {{ card.salaryDesc }}
+学历要求: {{ card.degreeName }}
+经验要求: {{ card.experienceName }}
+技能要求: {{ data.skills }}
+岗位标签: {{ card.jobLabels }}
+HR: {{ card.bossName }} {{ card.bossTitle }}
+岗位描述:
+{{ card.postDescription }}`,
         },
       ],
     ],
@@ -155,81 +260,70 @@ export const formInfoData: FormInfoData = {
     label: 'AI过滤',
     'data-help': '根据工作内容让gpt分析过滤，真是太稳健了，不放过任何一个垃圾',
     example: [
-      `我现在需要求职，让你根据我的需要对岗位进行评分，方便我筛选岗位。
-  ## 要求:
-  - 加分: 双休,早九晚五,新技术,机会多,年轻人多 每个加分项 10分
-  - 扣分: 需要上门,福利少,需要和客户交流,需要推销 每个扣分项 10分
-  
-  ## 待处理的岗位信息:
-  <岗位信息>
-  岗位名:{{ card.jobName }}   薪资: {{ card.salaryDesc }}
-  学历要求: {{ card.degreeName }}    工作经验要求: {{ card.experienceName }}
-  福利列表: {{ data.welfareList }}
-  技能要求: {{ data.skills }}
-  岗位标签:{{ card.jobLabels }}
-    <岗位描述>
-    {{ card.postDescription }}
-    <岗位描述/>
-  </岗位信息>
-  
-  ## 输出
-  
-  总是输出以下Json格式
-  
-  interface aiFilteringItem {
-    reason: string; // 扣分或加分的理由
-    score: number ; // 分数变化 正整数 不需要+-正负符号
-  }
-  
-  interface aiFiltering {
-    negative: aiFilteringItem[]; // 扣分项
-    positive: aiFilteringItem[] ; // 加分项
-  }
-  
-  总分低于10分将过滤掉`,
+      defaultAiFilteringPrompt,
       [
         {
           role: 'system',
-          content: `## 角色
-  求职评委
-  
-  最终返回下面格式的JSON字符串,不要有任何其他字符
-  
-  interface aiFilteringItem {
-    reason: string; // 扣分或加分的理由
-    score: number ; // 分数变化 正整数 不需要+-正负符号
-  }
-  
-  interface aiFiltering {
-    negative: aiFilteringItem[]; // 扣分项
-    positive: aiFilteringItem[] ; // 加分项
-  }
-  
-  ## 求职者需求
-  - 加分: 双休,早九晚五,新技术,机会多,年轻人多 每个加分项 10分
-  - 扣分: 需要上门,福利少,需要和客户交流,需要推销 每个扣分项 10分
-  `,
+          content: `你是求职岗位筛选助手。根据岗位信息输出严格 JSON，不要 Markdown、解释或额外文字。
+
+判断原则:
+- 加分: 技术岗位职责清晰、技术栈明确、成长空间好、远程/居家办公、双休或作息稳定、福利正常、岗位描述具体。
+- 远程加权: 明确支持远程办公、居家办公、不限工作地点、异地办公或低频到岗混合办公时，加 15 到 25 分。
+- 不找外包: 明确外包、驻场、外派、派遣、OD、人力外包、第三方交付、长期客户现场开发、项目制交付到客户处时，negative 必须扣 30 到 50 分；多项同时命中可扣 60 分。
+- 不考虑实习: 明确实习、校招、应届生、管培生、毕业生项目、可转正实习、在校生岗位、无经验培养岗时，negative 必须扣 30 到 50 分；岗位名直接写实习或校招时扣 60 分。
+- 扣分: 销售/地推/客服导向、低薪高要求、频繁出差、强商务属性、收费或培训贷、描述空泛、标远程但要求长期驻场或频繁到岗。
+- 外包证据: reason 必须写明证据词，例如“岗位描述写长期客户现场驻场”或“标签含外派/派遣/OD”；只有公司名像外包但岗位没证据时，最多按“外包风险需确认”扣 5 到 10 分。
+- 实习证据: reason 必须写明证据词，例如“岗位名含实习”或“岗位标签写校招/应届生”。
+- 没有证据的风险不要扣分；整体正常且无明显风险时，positive 至少给“岗位基本匹配”10 分。
+
+格式:
+{
+  "negative": [{ "reason": "扣分原因", "score": 10 }],
+  "positive": [{ "reason": "加分原因", "score": 10 }]
+}`,
         },
         {
           role: 'user',
-          content: `## 待处理的岗位信息:
-  <岗位信息>
-  岗位名:{{ card.jobName }}   薪资: {{ card.salaryDesc }}
-  学历要求: {{ card.degreeName }}    工作经验要求: {{ card.experienceName }}
-  福利列表: {{ data.welfareList }}
-  技能要求: {{ data.skills }}
-  岗位标签:{{ card.jobLabels }}
-    <岗位描述>
-    {{ card.postDescription }}
-    <岗位描述/>
-  </岗位信息>`,
+          content: `岗位名: {{ card.jobName }}
+薪资: {{ card.salaryDesc }}
+学历要求: {{ card.degreeName }}
+经验要求: {{ card.experienceName }}
+福利列表: {{ data.welfareList }}
+技能要求: {{ data.skills }}
+岗位标签: {{ card.jobLabels }}
+工作地址: {{ card.address }}
+通勤信息: 直线 {{ amap.straightDistance }}km，驾车 {{ amap.drivingDistance }}km/{{ amap.drivingDuration }}分钟，步行 {{ amap.walkingDistance }}km/{{ amap.walkingDuration }}分钟
+岗位描述:
+{{ card.postDescription }}`,
         },
       ],
     ],
   },
   aiReply: {
     label: 'AI回复',
-    'data-help': '万一消息太多，回不过来了呢，也许能和AiHR聊到地球爆炸？魔法击败魔法',
+    'data-help':
+      '在聊天页对当前打开会话进行自动回复。只处理对方新消息，不自动切换会话或遍历联系人。',
+    example: [
+      defaultAiReplyPrompt,
+      [
+        {
+          role: 'system',
+          content: `你是求职者本人，负责在 Boss 直聘聊天中回复招聘者。
+
+只输出回复正文，1 到 2 句，120 字以内。语气礼貌自然，不要编造经历、薪资、到岗时间或面试安排。`,
+        },
+        {
+          role: 'user',
+          content: `会话: {{ chat.title }}
+当前时间: {{ chat.now }}
+对方最后消息:
+{{ chat.currentMessage.content }}
+
+最近聊天记录:
+{{ chat.history }}`,
+        },
+      ],
+    ],
   },
   record: {
     label: '内容记录',
@@ -370,16 +464,16 @@ export const defaultFormData: FormData = {
   },
   aiGreeting: {
     enable: false,
-    prompt: '',
+    prompt: defaultAiGreetingPrompt,
   },
   aiFiltering: {
     enable: false,
-    prompt: '',
+    prompt: defaultAiFilteringPrompt,
     score: 10,
   },
   aiReply: {
     enable: false,
-    prompt: '',
+    prompt: defaultAiReplyPrompt,
   },
   amap: {
     key: '',

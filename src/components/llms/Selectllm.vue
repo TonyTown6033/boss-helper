@@ -45,8 +45,9 @@ const model = useModel()
 
 const show = defineModel<boolean>({ required: true })
 const currentModel = ref(conf.formData[props.data].model)
+const supportsVip = props.data !== 'aiReply'
 const singleMode = ref(
-  conf.formData[props.data].vip || signedKey.signedKey != null
+  supportsVip && (conf.formData[props.data].vip || signedKey.signedKey != null)
     ? ('vip' as const)
     : !Array.isArray(conf.formData[props.data].prompt),
 )
@@ -223,6 +224,7 @@ async function savePrompt() {
       return
     }
     conf.formData[props.data].model = currentModel.value
+    conf.formData[props.data].vip = false
   } else {
     conf.formData[props.data].vip = true
   }
@@ -286,7 +288,11 @@ async function copyOnlineResume() {
     </div>
     <div class="select-form-box">
       <ElRadioGroup v-model="singleMode" size="large" @update:model-value="changeMode">
-        <ElRadioButton :disabled="signedKey == null" label="会员模式(无需Prompt)" value="vip" />
+        <ElRadioButton
+          :disabled="!supportsVip || signedKey == null"
+          label="会员模式(无需Prompt)"
+          value="vip"
+        />
         <ElRadioButton label="单对话模式" :value="true" />
         <ElRadioButton label="多对话模式" :value="false" />
       </ElRadioGroup>
@@ -383,7 +389,7 @@ async function copyOnlineResume() {
     </ElForm>
     <template #footer>
       <ElButton @click="show = false"> 关闭 </ElButton>
-      <ElButton type="info" @click="test"> 测试 </ElButton>
+      <ElButton v-if="data !== 'aiReply'" type="info" @click="test"> 测试 </ElButton>
       <ElButton type="primary" @click="savePrompt"> 保存 </ElButton>
     </template>
   </ElDialog>

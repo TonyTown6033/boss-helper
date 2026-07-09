@@ -87,6 +87,20 @@ function csvEscape(value: unknown): string {
   return text
 }
 
+function rowFromContext(
+  job: MyJobListData,
+  filterStatus: CrawlerFilterStatus,
+  filterReason: string,
+  crawlError = '',
+): CrawlerRow {
+  return {
+    job,
+    filterStatus,
+    filterReason,
+    crawlError,
+  }
+}
+
 const csvColumns: CsvColumn[] = [
   { title: '职位名', value: (row) => row.job.card?.jobName ?? row.job.jobName },
   { title: '公司', value: (row) => row.job.card?.brandName ?? row.job.brandName },
@@ -148,27 +162,16 @@ async function evaluateFilters(job: MyJobListData, handlers: Handler[]): Promise
     for (const handler of handlers) {
       await handler({ data: job }, ctx)
     }
-    return {
-      job,
-      filterStatus: 'passed',
-      filterReason: '通过',
-      crawlError: '',
-    }
+    return rowFromContext(job, 'passed', '通过')
   } catch (error) {
     if (error instanceof BoosHelperError) {
-      return {
+      return rowFromContext(
         job,
-        filterStatus: error.state === 'warning' ? 'filtered' : 'error',
-        filterReason: `${error.name}: ${error.message}`,
-        crawlError: '',
-      }
+        error.state === 'warning' ? 'filtered' : 'error',
+        `${error.name}: ${error.message}`,
+      )
     }
-    return {
-      job,
-      filterStatus: 'error',
-      filterReason: errorMessage(error),
-      crawlError: '',
-    }
+    return rowFromContext(job, 'error', errorMessage(error))
   } finally {
     restoreStatistics(statistics, statisticsSnapshot)
     chatMessages.value.splice(chatLength)
@@ -182,12 +185,7 @@ async function collectJob(job: MyJobListData, handlers: Handler[]): Promise<Craw
     }
   } catch (error) {
     const message = errorMessage(error)
-    return {
-      job,
-      filterStatus: 'error',
-      filterReason: `详情获取失败: ${message}`,
-      crawlError: message,
-    }
+    return rowFromContext(job, 'error', `详情获取失败: ${message}`, message)
   }
 
   return evaluateFilters(job, handlers)

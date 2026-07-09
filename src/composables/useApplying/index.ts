@@ -74,13 +74,17 @@ export async function createReadonlyFilterHandle(): Promise<{
   before: Handler[]
 }> {
   const h = handles()
-  const pipeline = createPipeline(h, false)
+  const pipeline = createPipeline(h, false, false)
   return {
     before: compilePipeline(pipeline).before,
   }
 }
 
-function createPipeline(h: ReturnType<typeof handles>, includeGreeting: boolean): Pipeline {
+function createPipeline(
+  h: ReturnType<typeof handles>,
+  includeGreeting: boolean,
+  includeAiFiltering = true,
+): Pipeline {
   const cardPipeline: Pipeline = [
     // Card卡片信息获取
     async (args) => {
@@ -114,8 +118,10 @@ function createPipeline(h: ReturnType<typeof handles>, includeGreeting: boolean)
       },
       h.amap(),
     ],
-    h.aiFiltering(), // AI过滤
   ]
+  if (includeAiFiltering) {
+    cardPipeline.push(h.aiFiltering()) // AI过滤
+  }
   if (includeGreeting) {
     cardPipeline.push(h.greeting()) // 招呼语
   }

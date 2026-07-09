@@ -36,3 +36,10 @@ logapi.zhipin.*.pem
 .wxt
 
 /temp
+
+# 本地采集/调试产物，可能含简历或聊天 PII，禁止提交
+/resume
+/tmp
+/cpp
+boss-chat-*.json
+boss-jobs-*.csv

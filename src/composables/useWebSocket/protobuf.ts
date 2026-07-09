@@ -9,6 +9,7 @@ interface MessageArgs {
   to_name: string // encryptBossId  擦,boss的id不是岗位的
   content?: string
   image?: string // url
+  friendSource?: number
 }
 
 interface ChatSdkUser {
@@ -61,7 +62,7 @@ export class Message {
           to: {
             uid: args.to_uid,
             name: args.to_name,
-            source: 0,
+            source: args.friendSource ?? 0,
           },
           type: 1,
           mid: d.toString(),
@@ -91,8 +92,8 @@ export class Message {
     return {
       uid: Number.isFinite(uid) ? uid : this.args.to_uid,
       encryptUid: this.args.to_name,
-      friendSource: 0,
-      source: 0,
+      friendSource: this.args.friendSource ?? 0,
+      source: this.args.friendSource ?? 0,
     }
   }
 

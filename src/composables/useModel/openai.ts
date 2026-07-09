@@ -47,8 +47,8 @@ const info: llmInfo<openaiLLMConf> = {
   },
   model: {
     config: {
-      placeholder: 'gpt-4o-mini',
-      options: ['gpt-4o-mini', 'gpt-4o', 'gpt-4', 'deepseek-chat'].map((item) => ({
+      placeholder: 'gpt-5.5',
+      options: ['gpt-5.5', 'gpt-4o', 'gpt-4', 'deepseek-chat'].map((item) => ({
         label: item,
         value: item,
       })),

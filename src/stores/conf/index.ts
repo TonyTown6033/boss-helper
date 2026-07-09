@@ -10,7 +10,7 @@ import deepmerge, { jsonClone } from '@/utils/deepmerge'
 import { exportJson, importJson } from '@/utils/jsonImportExport'
 import { logger } from '@/utils/logger'
 
-import { defaultFormData } from './info'
+import { defaultFormData, legacyAiReplyPrompt } from './info'
 
 export * from './info'
 
@@ -75,6 +75,16 @@ export const useConf = defineStore('conf', () => {
     let from = await counter.storageGet<Partial<FormData>>(formDataKey, {})
     from = (await formDataHandler(from)) ?? from
     const data = deepmerge<FormData>(defaultFormData, from)
+    if (!data.aiReply.prompt || data.aiReply.prompt === legacyAiReplyPrompt) {
+      data.aiReply.prompt = defaultFormData.aiReply.prompt
+    }
+    // 旧版本 aiGreeting/aiFiltering 默认 prompt 为空串，空配置无法工作，回填新默认提示词
+    if (!data.aiGreeting.prompt) {
+      data.aiGreeting.prompt = defaultFormData.aiGreeting.prompt
+    }
+    if (!data.aiFiltering.prompt) {
+      data.aiFiltering.prompt = defaultFormData.aiFiltering.prompt
+    }
     Object.assign(formData, data)
     isLoaded.value = true
   }

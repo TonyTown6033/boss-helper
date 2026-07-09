@@ -21,6 +21,9 @@ async function main(router: any) {
     case '/web/geek/jobs':
       module = await import('@/pages/zhipin')
       break
+    case '/web/geek/chat':
+      module = await import('@/pages/zhipin-chat')
+      break
   }
   module.run()
   const helper = document.querySelector('#boss-helper')
